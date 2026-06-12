@@ -4,11 +4,11 @@ Downloads pdf files from excel sheet.
 
 ## Getting Started
 
-- Under releases section on GitHub (on the right side) find the most recent release and click on it.
-- Download the zip file at the top (not source code).
-- Extract file and in the folder publish there will be a PdfDownloaderWPF.exe file.
-- Run the .exe.
-- Windows may show a warning ("Windows protected your PC") because the program isn't digitally signed. If this happens, click More info, then Run anyway.
+- Under releases section on GitHub (on the right side) find the most recent release and click on it
+- Download the zip file at the top (not source code)
+- Extract file and in the folder publish there will be a PdfDownloaderWPF.exe file
+- Run the .exe
+- Windows may show a warning ("Windows protected your PC") because the program isn't digitally signed. If this happens, click More info, then Run anyway
 
 ## How to Use It
 
