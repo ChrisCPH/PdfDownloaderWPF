@@ -1,0 +1,92 @@
+﻿<Window x:Class="PdfDownloaderWPF.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PDF Downloader" Height="300" Width="600">
+
+    <Grid Margin="10">
+
+        <Grid.RowDefinitions>
+            <!-- Row 0: Input file label -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Row 1: Input file textbox + browse button -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Row 2: Download folder label -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Row 3: Download folder textbox + browse button -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Row 4: Result Excel file label -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Row 5: Result Excel textbox + browse button -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Row 6: Start Download button -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Row 7: Reset Progress button -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Row 8: Progress bar -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- INPUT FILE LABEL -->
+        <TextBlock Text="Excel input file"
+               FontWeight="Bold"
+               Margin="0,0,0,5"/>
+
+        <!-- INPUT FILE -->
+        <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,10">
+            <TextBox Width="400" Name="InputFileBox"/>
+            <Button Content="Browse" Click="BrowseInputFile"/>
+        </StackPanel>
+
+        <!-- OUTPUT FOLDER LABEL -->
+        <TextBlock Text="Download folder"
+               Grid.Row="2"
+               FontWeight="Bold"
+               Margin="0,10,0,5"/>
+
+        <!-- OUTPUT FOLDER -->
+        <StackPanel Orientation="Horizontal" Grid.Row="3" Margin="0,0,0,10">
+            <TextBox Width="400" Name="OutputFolderBox"/>
+            <Button Content="Browse" Click="BrowseOutputFolder"/>
+        </StackPanel>
+
+        <!-- OUTPUT EXCEL LABEL -->
+        <TextBlock Text="Result Excel file"
+               Grid.Row="4"
+               FontWeight="Bold"
+               Margin="0,10,0,5"/>
+
+        <!-- OUTPUT EXCEL -->
+        <StackPanel Orientation="Horizontal" Grid.Row="5" Margin="0,0,0,10">
+            <TextBox Width="400" Name="OutputExcelBox"/>
+            <Button Content="Browse" Click="BrowseOutputExcel"/>
+        </StackPanel>
+
+        <!-- START BUTTON -->
+        <Button Content="Start Download"
+            Grid.Row="6"
+            Height="30"
+            Margin="0,10"
+            Click="StartDownload"/>
+        
+        <!-- RESET BUTTON -->
+        <Button Content="Reset"
+            Grid.Row="7"
+            Height="30"
+            Margin="0,0,0,10"
+            Click="ResetProgress"/>
+
+
+        <!-- PROGRESS BAR -->
+        <ProgressBar Grid.Row="8"
+                 Height="20"
+                 Name="ProgressBar"/>
+    </Grid>
+</Window>
