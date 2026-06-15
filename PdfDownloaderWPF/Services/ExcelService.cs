@@ -38,6 +38,7 @@ namespace PdfDownloader.Services
             ws.Cell(1, 3).Value = "Success";
             ws.Cell(1, 4).Value = "UsedUrl";
             ws.Cell(1, 5).Value = "DownloadDate";
+            ws.Cell(1, 6).Value = "ErrorMessage";
 
             var row = 2;
 
@@ -48,6 +49,7 @@ namespace PdfDownloader.Services
                 ws.Cell(row, 3).Value = result.Success;
                 ws.Cell(row, 4).Value = result.UsedUrl;
                 ws.Cell(row, 5).Value = result.DownloadDate;
+                ws.Cell(row, 6).Value = result.ErrorMessage;
 
                 row++;
             }

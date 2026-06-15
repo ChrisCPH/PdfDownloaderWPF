@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="PdfDownloaderWPF.Tests/PdfDownloaderWPF.Tests.csproj" />
   <Project Path="PdfDownloaderWPF/PdfDownloaderWPF.csproj" />
 </Solution>

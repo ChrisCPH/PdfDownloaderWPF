@@ -6,6 +6,6 @@ namespace PdfDownloader.Models
 {
     public class DownloadState
     {
-        public HashSet<int> DownloadedIds { get; set; } = [];
+        public Dictionary<int, DownloadResult> Results { get; set; } = new();
     }
 }

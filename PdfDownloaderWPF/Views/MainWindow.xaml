@@ -1,7 +1,7 @@
 ﻿<Window x:Class="PdfDownloaderWPF.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="PDF Downloader" Height="300" Width="600">
+        Title="PDF Downloader" Height="350" Width="600">
 
     <Grid Margin="10">
 
@@ -32,6 +32,7 @@
 
             <!-- Row 8: Progress bar -->
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- INPUT FILE LABEL -->
@@ -82,7 +83,6 @@
             Height="30"
             Margin="0,0,0,10"
             Click="ResetProgress"/>
-
 
         <!-- PROGRESS BAR -->
         <ProgressBar Grid.Row="8"

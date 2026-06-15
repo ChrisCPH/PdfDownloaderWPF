@@ -10,27 +10,34 @@ namespace PdfDownloader.Services
 
     public class StateService
     {
-        private static readonly string FileName = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "PdfDownloader", "state.json");
+        private readonly string _filePath;
 
-        public StateService()
+        public StateService(string? filePath = null)
         {
-            var directory = Path.GetDirectoryName(FileName);
+            _filePath = filePath ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "PdfDownloader", "state.json");
+
+            var directory = Path.GetDirectoryName(_filePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
                 Directory.CreateDirectory(directory);
-            }
         }
 
         public DownloadState Load()
         {
-            if (!File.Exists(FileName))
+            if (!File.Exists(_filePath))
                 return new DownloadState();
 
-            var json = File.ReadAllText(FileName);
-            return JsonSerializer.Deserialize<DownloadState>(json)
-                   ?? new DownloadState();
+            try
+            {
+                var json = File.ReadAllText(_filePath);
+                return JsonSerializer.Deserialize<DownloadState>(json)
+                       ?? new DownloadState();
+            }
+            catch (JsonException)
+            {
+                return new DownloadState();
+            }
         }
 
         public void Save(DownloadState state)
@@ -40,13 +47,19 @@ namespace PdfDownloader.Services
                 WriteIndented = true
             });
 
-            File.WriteAllText(FileName, json);
+            var tempPath = _filePath + ".tmp";
+            File.WriteAllText(tempPath, json);
+
+            if (File.Exists(_filePath))
+                File.Replace(tempPath, _filePath, null);
+            else
+                File.Move(tempPath, _filePath);
         }
 
         public void Reset()
         {
-            if (File.Exists(FileName))
-                File.Delete(FileName);
+            if (File.Exists(_filePath))
+                File.Delete(_filePath);
         }
     }
 }

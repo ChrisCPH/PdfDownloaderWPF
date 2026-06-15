@@ -52,23 +52,9 @@ namespace PdfDownloaderWPF.Views
                     current++;
                     ProgressBar.Value = (double)current / total * 100;
 
-                    if (state.DownloadedIds.Contains(record.Id))
+                    if (state.Results.TryGetValue(record.Id, out var existing) && existing.Success)
                     {
-                        var urlForName = !string.IsNullOrWhiteSpace(record.PrimaryUrl)
-                            ? record.PrimaryUrl
-                            : record.BackupUrl;
-
-                        results.Add(new DownloadResult
-                        {
-                            Id = record.Id,
-                            PrimaryUrl = record.PrimaryUrl,
-                            BackupUrl = record.BackupUrl,
-                            Success = true,
-                            FileName = !string.IsNullOrWhiteSpace(urlForName)
-                                ? FileNameService.GetFileName(urlForName, record.Id)
-                                : $"{record.Id}_file.pdf",
-                            ErrorMessage = "Skipped (already downloaded)"
-                        });
+                        results.Add(existing);
                         continue;
                     }
 
@@ -79,7 +65,7 @@ namespace PdfDownloaderWPF.Views
 
                     if (result.Success)
                     {
-                        state.DownloadedIds.Add(record.Id);
+                        state.Results[record.Id] = result;
                         stateService.Save(state);
                     }
 
