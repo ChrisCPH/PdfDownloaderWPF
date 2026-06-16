@@ -3,10 +3,11 @@ using System.Net.Http.Headers;
 using System.Text;
 using PdfDownloader.Models;
 using PdfDownloader.Services;
+using PdfDownloaderWPF.Tests.TestHelperClasses;
 
 namespace PdfDownloaderWPF.Tests;
 
-public class DownloadServiceMoreTests
+public class DownloadServiceTests
 {
     private static readonly byte[] PdfBytes = Encoding.ASCII.GetBytes("%PDF-1.4 fake content");
 
@@ -51,18 +52,16 @@ public class DownloadServiceMoreTests
         var handler = new FakeHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-
             if (uri == originalUrl)
                 return HtmlResponse("<html>loading...</html>", finalUri: wrapperUri);
-
             if (uri == resolvedUrl)
                 return PdfResponse(PdfBytes);
-
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 1, PrimaryUrl = originalUrl };
@@ -71,10 +70,10 @@ public class DownloadServiceMoreTests
         Assert.True(result.Success);
         Assert.Equal(originalUrl, result.UsedUrl);
         Assert.True(File.Exists(Path.Combine(tempDir, result.FileName!)));
+        Assert.Equal(0, browserService.CallCount);
 
         Directory.Delete(tempDir, true);
     }
-
 
     [Fact]
     public async Task DownloadPdfAsync_HtmlWrapperWithEmbeddedPdfLink_ResolvesViaRegexAndDownloads()
@@ -85,21 +84,19 @@ public class DownloadServiceMoreTests
         var handler = new FakeHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-
             if (uri == originalUrl)
             {
                 var html = $"<html><body><a href=\"{resolvedUrl}\">Download</a></body></html>";
                 return HtmlResponse(html, finalUri: "https://example.com/viewer-final");
             }
-
             if (uri == resolvedUrl)
                 return PdfResponse(PdfBytes);
-
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 2, PrimaryUrl = originalUrl };
@@ -107,6 +104,7 @@ public class DownloadServiceMoreTests
 
         Assert.True(result.Success);
         Assert.True(File.Exists(Path.Combine(tempDir, result.FileName!)));
+        Assert.Equal(0, browserService.CallCount);
 
         Directory.Delete(tempDir, true);
     }
@@ -120,15 +118,14 @@ public class DownloadServiceMoreTests
         var handler = new FakeHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-
             if (uri == originalUrl)
                 return HtmlResponse("<html>loading...</html>", finalUri: wrapperUri);
-
             return HtmlResponse("<html>still not a pdf</html>");
         });
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 3, PrimaryUrl = originalUrl };
@@ -151,7 +148,8 @@ public class DownloadServiceMoreTests
                 finalUri: "https://example.com/viewer-final"));
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 4, PrimaryUrl = originalUrl };
@@ -171,7 +169,8 @@ public class DownloadServiceMoreTests
         var handler = new FakeHttpMessageHandler(req => PdfResponse(notReallyPdf));
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 5, PrimaryUrl = "https://example.com/fake.pdf" };
@@ -179,8 +178,6 @@ public class DownloadServiceMoreTests
 
         Assert.False(result.Success);
         Assert.Contains("not a valid PDF", result.ErrorMessage);
-
-        // No .pdf or .tmp files should be left behind
         Assert.Empty(Directory.GetFiles(tempDir));
 
         Directory.Delete(tempDir, true);
@@ -193,7 +190,8 @@ public class DownloadServiceMoreTests
             PdfResponse(PdfBytes, contentType: "application/octet-stream"));
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 6, PrimaryUrl = "https://example.com/file" };
@@ -211,7 +209,8 @@ public class DownloadServiceMoreTests
         var handler = new FakeHttpMessageHandler(req => PdfResponse(PdfBytes));
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 7, PrimaryUrl = "https://example.com/report.pdf" };
@@ -232,14 +231,14 @@ public class DownloadServiceMoreTests
         var handler = new FakeHttpMessageHandler(req => PdfResponse(PdfBytes));
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 8, PrimaryUrl = "https://example.com/report.pdf" };
         var expectedFileName = FileNameService.GetFileName(record.PrimaryUrl, record.Id);
         var expectedPath = Path.Combine(tempDir, expectedFileName);
 
-        // Simulate a leftover/old file from a previous run
         await File.WriteAllTextAsync(expectedPath, "old partial content");
 
         var result = await service.DownloadPdfAsync(record, tempDir, FileNameService.GetFileName);
@@ -258,11 +257,11 @@ public class DownloadServiceMoreTests
         var handler = new FakeHttpMessageHandler(req => PdfResponse(PdfBytes));
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 9, PrimaryUrl = "https://example.com/report" };
-
         Func<string, int, string> fileNameFunc = (url, id) => $"{id}_custom";
 
         var result = await service.DownloadPdfAsync(record, tempDir, fileNameFunc);
@@ -281,12 +280,12 @@ public class DownloadServiceMoreTests
         {
             if (req.RequestUri!.ToString().Contains("primary"))
                 throw new TaskCanceledException("Simulated timeout");
-
             return PdfResponse(PdfBytes);
         });
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord
@@ -311,7 +310,8 @@ public class DownloadServiceMoreTests
             throw new TaskCanceledException("Simulated timeout"));
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 11, PrimaryUrl = "https://example.com/slow.pdf" };
@@ -324,18 +324,18 @@ public class DownloadServiceMoreTests
     }
 
     [Fact]
-    public async Task DownloadPdfAsync_PrimaryAnd_BackupBothFail_ErrorReflectsBackupFailure()
+    public async Task DownloadPdfAsync_PrimaryAndBackupBothFail_ErrorReflectsBackupFailure()
     {
         var handler = new FakeHttpMessageHandler(req =>
         {
             if (req.RequestUri!.ToString().Contains("primary"))
-                return new HttpResponseMessage(HttpStatusCode.NotFound); // 404
-
-            return new HttpResponseMessage(HttpStatusCode.Forbidden); // 403
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            return new HttpResponseMessage(HttpStatusCode.Forbidden);
         });
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord
@@ -360,7 +360,8 @@ public class DownloadServiceMoreTests
             new HttpResponseMessage(HttpStatusCode.NotFound));
 
         var client = new HttpClient(handler);
-        var service = new DownloadService(client);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
         var tempDir = CreateTempDir();
 
         var record = new PdfRecord { Id = 13, PrimaryUrl = "", BackupUrl = "" };
@@ -369,6 +370,87 @@ public class DownloadServiceMoreTests
         Assert.False(result.Success);
         Assert.Equal("13_file.pdf", result.FileName);
         Assert.Equal("No URL provided", result.ErrorMessage);
+
+        Directory.Delete(tempDir, true);
+    }
+
+    [Fact]
+    public async Task DownloadPdfAsync_HttpClientFails_BrowserFallbackIsCalled()
+    {
+        var handler = new FakeHttpMessageHandler(req =>
+            new HttpResponseMessage(HttpStatusCode.Forbidden));
+
+        var client = new HttpClient(handler);
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
+        var tempDir = CreateTempDir();
+
+        var record = new PdfRecord { Id = 14, PrimaryUrl = "https://example.com/blocked.pdf" };
+        await service.DownloadPdfAsync(record, tempDir, FileNameService.GetFileName);
+
+        Assert.True(browserService.CallCount > 0);
+
+        Directory.Delete(tempDir, true);
+    }
+
+    [Fact]
+    public async Task DownloadPdfAsync_HttpClientFails_BrowserFallbackSucceeds_ReturnsSuccess()
+    {
+        var handler = new FakeHttpMessageHandler(req =>
+            new HttpResponseMessage(HttpStatusCode.Forbidden));
+
+        var client = new HttpClient(handler);
+        var browserService = new FakeBrowserDownloadServiceSuccess();
+        var service = new DownloadService(client, browserService);
+        var tempDir = CreateTempDir();
+
+        var record = new PdfRecord { Id = 15, PrimaryUrl = "https://example.com/blocked.pdf" };
+        var result = await service.DownloadPdfAsync(record, tempDir, FileNameService.GetFileName);
+
+        Assert.True(result.Success);
+        Assert.Equal("https://example.com/blocked.pdf", result.UsedUrl);
+        Assert.True(File.Exists(Path.Combine(tempDir, result.FileName!)));
+        Assert.Equal(1, browserService.CallCount);
+
+        Directory.Delete(tempDir, true);
+    }
+
+    [Fact]
+    public async Task DownloadPdfAsync_HttpClientSucceeds_BrowserFallbackIsNeverCalled()
+    {
+        var handler = new FakeHttpMessageHandler(req => PdfResponse(PdfBytes));
+
+        var client = new HttpClient(handler);
+        var browserService = new FakeBrowserDownloadServiceSuccess();
+        var service = new DownloadService(client, browserService);
+        var tempDir = CreateTempDir();
+
+        var record = new PdfRecord { Id = 16, PrimaryUrl = "https://example.com/report.pdf" };
+        var result = await service.DownloadPdfAsync(record, tempDir, FileNameService.GetFileName);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, browserService.CallCount);
+
+        Directory.Delete(tempDir, true);
+    }
+
+    [Fact]
+    public async Task DownloadPdfAsync_BothHttpClientAndBrowserFail_ReturnsHttpClientError()
+    {
+        var handler = new FakeHttpMessageHandler(req =>
+            new HttpResponseMessage(HttpStatusCode.Forbidden));
+
+        var client = new HttpClient(handler);
+
+        var browserService = new FakeBrowserDownloadService();
+        var service = new DownloadService(client, browserService);
+        var tempDir = CreateTempDir();
+
+        var record = new PdfRecord { Id = 17, PrimaryUrl = "https://example.com/blocked.pdf" };
+        var result = await service.DownloadPdfAsync(record, tempDir, FileNameService.GetFileName);
+
+        Assert.False(result.Success);
+        Assert.Contains("403", result.ErrorMessage);
 
         Directory.Delete(tempDir, true);
     }

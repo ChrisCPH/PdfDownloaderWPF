@@ -1,21 +1,25 @@
-﻿using PdfDownloader.Models;
+﻿using Microsoft.Win32;
+using Ookii.Dialogs.Wpf;
+using PdfDownloader.Models;
 using PdfDownloader.Services;
+using PdfDownloaderWPF.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
-using Microsoft.Win32;
-using Ookii.Dialogs.Wpf;
 
 namespace PdfDownloaderWPF.Views
 {
     public partial class MainWindow : Window
     {
+        private TaskCompletionSource<bool>? _pauseTcs;
+
         public MainWindow()
         {
             InitializeComponent();
+            Task.Run(EnsurePlaywrightInstalled);
         }
 
         private async void StartDownload(object sender, RoutedEventArgs e)
@@ -23,6 +27,9 @@ namespace PdfDownloaderWPF.Views
             var inputFile = InputFileBox.Text;
             var outputFolder = OutputFolderBox.Text;
             var outputExcel = OutputExcelBox.Text;
+
+            StartButton.IsEnabled = false;
+            PauseButton.IsEnabled = true;
 
             var excelService = new ExcelService();
             var stateService = new StateService();
@@ -33,7 +40,8 @@ namespace PdfDownloaderWPF.Views
             };
 
             var httpClient = new HttpClient(handler);
-            var downloadService = new DownloadService(httpClient);
+            var browserDownloadService = new BrowserDownloadService();
+            var downloadService = new DownloadService(httpClient, browserDownloadService);
 
             var records = excelService.ReadRecords(inputFile)
                 .OrderBy(x => x.Id)
@@ -49,6 +57,8 @@ namespace PdfDownloaderWPF.Views
             {
                 foreach (var record in records)
                 {
+                    await WaitIfPausedAsync();
+
                     current++;
                     ProgressBar.Value = (double)current / total * 100;
 
@@ -75,6 +85,13 @@ namespace PdfDownloaderWPF.Views
             catch (Exception ex)
             {
                 MessageBox.Show($"Fatal error: {ex.Message}");
+            }
+            finally
+            {
+                StartButton.IsEnabled = true;
+                PauseButton.IsEnabled = false;
+                PauseButton.Content = "Pause";
+                _pauseTcs = null;
             }
 
             excelService.WriteResults(outputExcel, results);
@@ -131,6 +148,45 @@ namespace PdfDownloaderWPF.Views
                 var stateService = new StateService();
                 stateService.Reset();
                 MessageBox.Show("Progress reset. All records will be re-checked on the next download.");
+            }
+        }
+
+        private Task WaitIfPausedAsync()
+        {
+            return _pauseTcs?.Task ?? Task.CompletedTask;
+        }
+
+        private void PauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_pauseTcs == null)
+            {
+                _pauseTcs = new TaskCompletionSource<bool>();
+                PauseButton.Content = "Resume";
+            }
+            else
+            {
+                _pauseTcs.SetResult(true);
+                _pauseTcs = null;
+                PauseButton.Content = "Pause";
+            }
+        }
+
+        private static void EnsurePlaywrightInstalled()
+        {
+            try
+            {
+                var exitCode = Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
+                if (exitCode != 0)
+                    throw new Exception("Playwright install failed");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to install required browser components: {ex.Message}\n\n" +
+                    "The app will still work but some downloads may fail.",
+                    "Setup Warning",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
         }
     }

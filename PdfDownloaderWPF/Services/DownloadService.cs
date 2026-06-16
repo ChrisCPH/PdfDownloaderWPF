@@ -5,16 +5,19 @@ using System.Net.Http;
 using System.Text;
 using System.IO;
 using System.Diagnostics;
+using PdfDownloaderWPF.Services;
 
 namespace PdfDownloader.Services
 {
     public class DownloadService
     {
         private readonly HttpClient _httpClient;
+        private readonly IBrowserDownloadService _browserDownloadService;
 
-        public DownloadService(HttpClient httpClient)
+        public DownloadService(HttpClient httpClient, IBrowserDownloadService browserDownloadService)
         {
             _httpClient = httpClient;
+            _browserDownloadService = browserDownloadService;
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
 
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
@@ -70,10 +73,39 @@ namespace PdfDownloader.Services
                 }
             }
 
+            var httpClientError = lastError;
+
+            foreach (var url in urls)
+            {
+                try
+                {
+                    Debug.WriteLine($"Trying Playwright for: {url}");
+
+                    var (pwSuccess, pwFileName, pwError) = await _browserDownloadService.TryDownloadWithPlaywrightAsync(
+                        url, record.Id, outputFolder, fileNameFunc);
+
+                    Debug.WriteLine($"Playwright result: Success={pwSuccess}, Error={pwError}");
+
+                    if (pwSuccess)
+                    {
+                        result.Success = true;
+                        result.UsedUrl = url;
+                        result.FileName = pwFileName!;
+                        result.DownloadDate = DateTime.Now;
+                        return result;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Playwright exception: {ex.Message}");
+                    if (httpClientError == null)
+                        lastError = ex;
+                }
+            }
+
             result.Success = false;
             result.FileName = $"{record.Id}_file.pdf";
-            if (lastError != null)
-                result.ErrorMessage = lastError.Message;
+            result.ErrorMessage = (httpClientError ?? lastError)?.Message ?? string.Empty;
 
             return result;
         }

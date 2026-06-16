@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace PdfDownloaderWPF.Tests
+namespace PdfDownloaderWPF.Tests.TestHelperClasses
 {
     public class FakeHttpMessageHandler : HttpMessageHandler
     {
