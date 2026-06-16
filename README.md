@@ -9,6 +9,7 @@ Downloads pdf files from excel sheet.
 - Extract file and in the folder publish there will be a PdfDownloaderWPF.exe file
 - Run the .exe
 - Windows may show a warning ("Windows protected your PC") because the program isn't digitally signed. If this happens, click More info, then Run anyway
+- First launch may take a minute to download browser components automatically
 
 ## How to Use It
 
