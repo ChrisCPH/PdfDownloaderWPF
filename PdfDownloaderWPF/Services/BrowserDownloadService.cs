@@ -15,54 +15,12 @@ namespace PdfDownloaderWPF.Services
                 string outputFolder,
                 Func<string, int, string> fileNameFunc)
         {
-            // 1. Fast API attempt
-            var apiResult = await TryApiDownloadAsync(url, recordId, outputFolder, fileNameFunc);
-            if (apiResult.Success)
-                return apiResult;
 
-            // 2. Browser fallback (JS-heavy sites)
             using var playwright = await Playwright.CreateAsync();
             var browserResult = await TryBrowserDownloadAsync(
                 playwright, url, recordId, outputFolder, fileNameFunc);
 
             return browserResult;
-        }
-
-        private async Task<(bool Success, string? FileName, string? Error)>
-            TryApiDownloadAsync(string url, int recordId, string outputFolder, Func<string, int, string> fileNameFunc)
-        {
-            try
-            {
-                using var playwright = await Playwright.CreateAsync();
-
-                var context = await playwright.APIRequest.NewContextAsync(new()
-                {
-                    ExtraHTTPHeaders = new Dictionary<string, string>
-                    {
-                        ["Accept"] = "application/pdf,*/*",
-                        ["User-Agent"] =
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
-                    }
-                });
-
-                var response = await context.GetAsync(url);
-
-                if (!response.Ok)
-                    return (false, null, $"HTTP {(int)response.Status}");
-
-                var bytes = await response.BodyAsync();
-
-                if (IsPdf(bytes))
-                {
-                    return await SaveBytesAsync(bytes, url, recordId, outputFolder, fileNameFunc);
-                }
-
-                return (false, null, "API response was not a PDF");
-            }
-            catch (Exception ex)
-            {
-                return (false, null, ex.Message);
-            }
         }
 
         private static async Task<(bool Success, string? FileName, string? Error)>
