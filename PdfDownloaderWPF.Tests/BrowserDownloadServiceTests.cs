@@ -17,7 +17,7 @@ namespace PdfDownloaderWPF.Tests
             Directory.CreateDirectory(tempDir);
 
             var (success, fileName, error) = await service.TryDownloadWithPlaywrightAsync(
-                "https://www.learningcontainer.com/wp-content/uploads/2019/09/sample-pdf-file.pdf",
+                "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
                 1,
                 tempDir,
                 FileNameService.GetFileName);

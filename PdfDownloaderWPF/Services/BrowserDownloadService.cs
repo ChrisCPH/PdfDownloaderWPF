@@ -8,6 +8,8 @@ namespace PdfDownloaderWPF.Services
 {
     public class BrowserDownloadService : IBrowserDownloadService
     {
+        private static readonly SemaphoreSlim _playwrightSemaphore = new(3);
+
         public async Task<(bool Success, string? FileName, string? Error)>
             TryDownloadWithPlaywrightAsync(
                 string url,
@@ -15,12 +17,17 @@ namespace PdfDownloaderWPF.Services
                 string outputFolder,
                 Func<string, int, string> fileNameFunc)
         {
-
-            using var playwright = await Playwright.CreateAsync();
-            var browserResult = await TryBrowserDownloadAsync(
-                playwright, url, recordId, outputFolder, fileNameFunc);
-
-            return browserResult;
+            await _playwrightSemaphore.WaitAsync();
+            try
+            {
+                using var playwright = await Playwright.CreateAsync();
+                return await TryBrowserDownloadAsync(
+                    playwright, url, recordId, outputFolder, fileNameFunc);
+            }
+            finally
+            {
+                _playwrightSemaphore.Release();
+            }
         }
 
         private static async Task<(bool Success, string? FileName, string? Error)>

@@ -83,9 +83,10 @@ namespace PdfDownloaderWPF.Views
                     await WaitIfPausedAsync();
                     if (state.Results.TryGetValue(record.Id, out var existing) && existing.Success)
                     {
+                        lock (stateLock)
+                            results.Add(existing);
                         Interlocked.Increment(ref current);
                         Dispatcher.Invoke(() => ProgressBar.Value = (double)current / total * 100);
-                        results.Add(existing);
                         return;
                     }
 

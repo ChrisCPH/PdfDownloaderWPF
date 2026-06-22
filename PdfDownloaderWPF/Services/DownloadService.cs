@@ -47,12 +47,14 @@ namespace PdfDownloader.Services
             }
 
             Exception? lastError = null;
+            var statusCodes = new List<int>();
 
             foreach (var url in urls)
             {
                 try
                 {
-                    var (success, fileName, error) = await TryDownloadAsync(url, record.Id, outputFolder, fileNameFunc);
+                    var (success, fileName, error, statusCode) = await TryDownloadAsync(url, record.Id, outputFolder, fileNameFunc);
+                    statusCodes.Add(statusCode);
                     if (success)
                     {
                         result.Success = true;
@@ -75,31 +77,36 @@ namespace PdfDownloader.Services
 
             var httpClientError = lastError;
 
-            foreach (var url in urls)
+            bool skipPlaywright = statusCodes.Count > 0 && statusCodes.All(c => c == 404 || c == 410);
+
+            if (!skipPlaywright)
             {
-                try
+                foreach (var url in urls)
                 {
-                    Debug.WriteLine($"Trying Playwright for: {url}");
-
-                    var (pwSuccess, pwFileName, pwError) = await _browserDownloadService.TryDownloadWithPlaywrightAsync(
-                        url, record.Id, outputFolder, fileNameFunc);
-
-                    Debug.WriteLine($"Playwright result: Success={pwSuccess}, Error={pwError}");
-
-                    if (pwSuccess)
+                    try
                     {
-                        result.Success = true;
-                        result.UsedUrl = url;
-                        result.FileName = pwFileName!;
-                        result.DownloadDate = DateTime.Now;
-                        return result;
+                        Debug.WriteLine($"Trying Playwright for: {url}");
+
+                        var (pwSuccess, pwFileName, pwError) = await _browserDownloadService.TryDownloadWithPlaywrightAsync(
+                            url, record.Id, outputFolder, fileNameFunc);
+
+                        Debug.WriteLine($"Playwright result: Success={pwSuccess}, Error={pwError}");
+
+                        if (pwSuccess)
+                        {
+                            result.Success = true;
+                            result.UsedUrl = url;
+                            result.FileName = pwFileName!;
+                            result.DownloadDate = DateTime.Now;
+                            return result;
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Playwright exception: {ex.Message}");
-                    if (httpClientError == null)
-                        lastError = ex;
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Playwright exception: {ex.Message}");
+                        if (httpClientError == null)
+                            lastError = ex;
+                    }
                 }
             }
 
@@ -118,7 +125,7 @@ namespace PdfDownloader.Services
             return urls;
         }
 
-        private async Task<(bool Success, string? FileName, Exception? Error)> TryDownloadAsync(
+        private async Task<(bool Success, string? FileName, Exception? Error, int StatusCode)> TryDownloadAsync(
             string url, int recordId, string outputFolder, Func<string, int, string> fileNameFunc)
         {
             var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -131,7 +138,7 @@ namespace PdfDownloader.Services
             Debug.WriteLine($"Final URI: {response.RequestMessage?.RequestUri}");
 
             if ((int)response.StatusCode >= 400)
-                return (false, null, new Exception($"HTTP {(int)response.StatusCode}"));
+                return (false, null, new Exception($"HTTP {(int)response.StatusCode}"), (int)response.StatusCode);
 
             var contentType = response.Content.Headers.ContentType?.MediaType;
 
@@ -141,10 +148,11 @@ namespace PdfDownloader.Services
                 contentType = response.Content.Headers.ContentType?.MediaType;
 
                 if (contentType == null || (!contentType.Contains("pdf") && !contentType.Contains("octet-stream")))
-                    return (false, null, new Exception($"Not a PDF (Content-Type: {contentType})"));
+                    return (false, null, new Exception($"Not a PDF (Content-Type: {contentType})"), (int)response.StatusCode);
             }
 
-            return await SavePdfAsync(response, url, recordId, outputFolder, fileNameFunc);
+            var saveResult = await SavePdfAsync(response, url, recordId, outputFolder, fileNameFunc);
+            return (saveResult.Item1, saveResult.Item2, saveResult.Item3, (int)response.StatusCode);
         }
 
         private async Task<HttpResponseMessage> ResolveRedirectWrapperAsync(HttpResponseMessage response)
