@@ -5,6 +5,7 @@ using PdfDownloader.Services;
 using PdfDownloaderWPF.Services;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -27,6 +28,24 @@ namespace PdfDownloaderWPF.Views
             var inputFile = InputFileBox.Text;
             var outputFolder = OutputFolderBox.Text;
             var outputExcel = OutputExcelBox.Text;
+
+            if (string.IsNullOrWhiteSpace(inputFile) || !File.Exists(inputFile))
+            {
+                MessageBox.Show("Please select a valid Excel input file.", "Missing Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(outputFolder) || !Directory.Exists(outputFolder))
+            {
+                MessageBox.Show("Please select a valid download folder.", "Missing Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(outputExcel))
+            {
+                MessageBox.Show("Please select a location to save the results Excel file.", "Missing Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
             StartButton.IsEnabled = false;
             PauseButton.IsEnabled = true;
@@ -51,48 +70,48 @@ namespace PdfDownloaderWPF.Views
             var results = new List<DownloadResult>();
 
             int total = records.Count;
+
+            var semaphore = new SemaphoreSlim(15);
+            var stateLock = new object();
             int current = 0;
 
-            try
+            var tasks = records.Select(async record =>
             {
-                foreach (var record in records)
+                await semaphore.WaitAsync();
+                try
                 {
                     await WaitIfPausedAsync();
-
-                    current++;
-                    ProgressBar.Value = (double)current / total * 100;
-
                     if (state.Results.TryGetValue(record.Id, out var existing) && existing.Success)
                     {
+                        Interlocked.Increment(ref current);
+                        Dispatcher.Invoke(() => ProgressBar.Value = (double)current / total * 100);
                         results.Add(existing);
-                        continue;
+                        return;
                     }
 
                     var result = await downloadService.DownloadPdfAsync(
-                        record,
-                        outputFolder,
-                        FileNameService.GetFileName);
+                        record, outputFolder, FileNameService.GetFileName);
 
-                    if (result.Success)
+                    lock (stateLock)
                     {
-                        state.Results[record.Id] = result;
-                        stateService.Save(state);
+                        if (result.Success)
+                        {
+                            state.Results[record.Id] = result;
+                            stateService.Save(state);
+                        }
+                        results.Add(result);
                     }
 
-                    results.Add(result);
+                    Interlocked.Increment(ref current);
+                    Dispatcher.Invoke(() => ProgressBar.Value = (double)current / total * 100);
                 }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Fatal error: {ex.Message}");
-            }
-            finally
-            {
-                StartButton.IsEnabled = true;
-                PauseButton.IsEnabled = false;
-                PauseButton.Content = "Pause";
-                _pauseTcs = null;
-            }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+
+            await Task.WhenAll(tasks);
 
             excelService.WriteResults(outputExcel, results);
 
@@ -175,7 +194,7 @@ namespace PdfDownloaderWPF.Views
         {
             try
             {
-                var exitCode = Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
+                var exitCode = Microsoft.Playwright.Program.Main([ "install", "chromium" ]);
                 if (exitCode != 0)
                     throw new Exception("Playwright install failed");
             }

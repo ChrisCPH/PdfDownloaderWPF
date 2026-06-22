@@ -54,6 +54,22 @@ namespace PdfDownloader.Services
                 row++;
             }
 
+            var successCount = results.Count(x => x.Success);
+            var failCount = results.Count - successCount;
+            var successRate = results.Count > 0 ? (double)successCount / results.Count * 100 : 0;
+
+            ws.Cell(1, 8).Value = "Total";
+            ws.Cell(1, 9).Value = results.Count;
+
+            ws.Cell(2, 8).Value = "Success";
+            ws.Cell(2, 9).Value = successCount;
+
+            ws.Cell(3, 8).Value = "Failed";
+            ws.Cell(3, 9).Value = failCount;
+
+            ws.Cell(4, 8).Value = "Success Rate";
+            ws.Cell(4, 9).Value = $"{successRate:F1}%";
+
             workbook.SaveAs(filePath);
         }
     }
